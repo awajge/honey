@@ -19,7 +19,6 @@ include fks.h then run fks_init() to get your entity allocator. make sure to run
  - use fks_count() to get the current entity count
  - use fks_vital() to see if an fks_entity_t is alive or not
  - it is HIGHLY recommended to never explicitly create an fks_entity_t
- - passing a NULL fks_world_t will result in underinfed behavior
 
 ### changes (v1):
  - minor bugfixes, cleaned up code naming (fks_instance_t -> fks_world_t, fks_entity.c/.h -> fks.c/.h)
