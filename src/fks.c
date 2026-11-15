@@ -150,7 +150,7 @@ void fks_world_fini(fks_world_t* wrld) {
         for (size_t i = 0; i < FKS_CSS2_PAGE_SIZE; ++i) {
             if ((tssl1 = cmpd->css[i]))
                 for (size_t j = 0; j < FKS_CSS1_PAGE_SIZE; ++j) free((*tssl1)[j]);
-                free(tssl1);
+            free(tssl1);
         }
         free(cmpd->rds), free(cmpd->cds), free(cmpd);
     }
@@ -176,7 +176,7 @@ fks_entity_t fks_entity_create(fks_world_t* wrld) {
         if (!(wrld->ehwm && ((wrld->ehwm + 1) & (FKS_ESL0_PAGE_SIZE - 1))) && !FKS_ESL0_CALLOC(wrld->esl[FKS_ESL1_IDX(wrld->ehwm + 1)]))
             return FKS_LOG_ALLOC("fks_esl0*"), FKS_NULL_ENTITY;
 
-            return wrld->nttc++, ++wrld->ehwm;
+        return wrld->nttc++, ++wrld->ehwm;
     }
 }
 

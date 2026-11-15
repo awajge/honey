@@ -8,16 +8,16 @@ a simple sparse/dense set ECS implementation.
  - optimized preprocessor utilization implementation -> no extra runtime overhead
  - full doxygen documentation - run 'doxygen Doxyfile' & open index.html in build/doxygen/html
  - modular build - self-contained 'world' struct contains everything
- - portability: ISO c99, no external libs, no gcc/clang builtins
+ - portability: ISO c99, no external libs, no gcc/clang builtins, simple c++ support 
  - full stderr logging system for errors & warnings
  - more coming soon... (multi-component querying, 'tag' components)
 
 ### startup:
- - include fks.h then run fks_init() to get your entity allocator. make sure to run fks_fini() once you're done to avoid memory leaks
+ - include fks.h then run fks_init() to get your ecs world. make sure to run fks_fini() once you're done to avoid memory leaks
  - compile with fks.c in your project
 
-### changes (v2):
- - major rework, full ecs system created
+### changes (v2.1):
+ - bugfixes/readme updates/document updates/c++ support
 ---
 #### I recommend installing [Makefile](https://www.gnu.org/software/make/) to build & run.
 #### Run 'doxygen Doxyfile' & open index.html in build/doxygen/html for documentation.
