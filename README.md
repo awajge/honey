@@ -11,8 +11,8 @@ a sparse/dense set ECS implementation built around the idea of making a simple, 
  - ISO c99, only std libs, no compiler builtins, simple c++ support 
  - more coming soon... (CMake support, multi-component querying, tag components)
 
-## changes (v2.2)
- - complete build system for static library & Doxygen documentation
+## changes (v1.0.0)
+ - first release
 
 ## build
  - install [Makefile](https://www.gnu.org/software/make/)
