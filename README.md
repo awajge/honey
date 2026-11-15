@@ -13,8 +13,8 @@ a simple sparse/dense set ECS implementation.
  - more coming soon... (multi-component querying, 'tag' components)
 
 ### startup:
- - include fks.h then run fks_init() to get your ecs world. make sure to run fks_fini() once you're done to avoid memory leaks
- - compile with fks.c in your project
+ - include honey.h then run hny_init() to get your ecs world. make sure to run hny_fini() once you're done to avoid memory leaks
+ - compile with honey.c in your project
 
 ### changes (v2.1):
  - bugfixes/readme updates/document updates/c++ support

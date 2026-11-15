@@ -1,8 +1,8 @@
-#ifndef FKS_H
-#define FKS_H
+#ifndef HONEY_H
+#define HONEY_H
 
 /**
- * @file fks.h
+ * @file honey.h
  * @author Akshat Wajge
  * @brief A simplistic approach to an ECS
  * @version 1.0
@@ -17,34 +17,34 @@ extern "C" {
 #endif
 
 /** Null entity represents the lack of an entity */
-#define FKS_NULL_ENTITY ((fks_entity_t) 0u)
+#define HNY_NULL_ENTITY ((hny_entity_t) 0u)
 
 /** Null component represents the lack of a component */
-#define FKS_NULL_COMPONENT ((fks_component_t) 0u)
+#define HNY_NULL_COMPONENT ((hny_component_t) 0u)
 
 /** 64 bit entity identifier (32 generation bits + 32 id bits) */
-typedef uint64_t fks_entity_t;
+typedef uint64_t hny_entity_t;
 
 /** 16 bit component id */
-typedef uint16_t fks_component_t;
+typedef uint16_t hny_component_t;
 
 /** ECS world instance */
-typedef struct fks_world_t fks_world_t;
+typedef struct hny_world_t hny_world_t;
 
 /**
  * @brief Initializes an ECS world instance
  * 
- * @return fks_world_t* Pointer to newly allocated world
+ * @return hny_world_t* Pointer to newly allocated world
  * @retval NULL Allocation failure
  */
-fks_world_t* fks_world_init(void);
+hny_world_t* hny_world_init(void);
 
 /**
  * @brief Frees an ECS world instance
  * 
  * @param wrld World to free
  */
-void fks_world_fini(fks_world_t* wrld);
+void hny_world_fini(hny_world_t* wrld);
 
 /**
  * @brief Returns world's entity count
@@ -54,7 +54,7 @@ void fks_world_fini(fks_world_t* wrld);
  * @return size_t [0, UINT32_MAX] entity count
  * @retval SIZE_MAX if wrld is NULL
  */
-size_t fks_world_entity_count(const fks_world_t* wrld);
+size_t hny_world_entity_count(const hny_world_t* wrld);
 
 /**
  * @brief Creates a new entity
@@ -64,10 +64,10 @@ size_t fks_world_entity_count(const fks_world_t* wrld);
  * UINT32_MAX+1, it wraps around back to 0.  
  * 
  * @param wrld ECS world
- * @return fks_entity_t Created entity
- * @retval FKS_NULL_ENTITY wrld is NULL or entity limit has been reached
+ * @return hny_entity_t Created entity
+ * @retval HNY_NULL_ENTITY wrld is NULL or entity limit has been reached
  */
-fks_entity_t fks_entity_create(fks_world_t* wrld);
+hny_entity_t hny_entity_create(hny_world_t* wrld);
 
 /**
  * @brief Destroys an entity
@@ -79,14 +79,14 @@ fks_entity_t fks_entity_create(fks_world_t* wrld);
  * @param wrld ECS world
  * @param ntt Entity to destroy
  * @return bool True if world and entity are valid, and entity is alive in the world - The
- * return value is functionally equivalent to @ref fks_entity_alive 
+ * return value is functionally equivalent to @ref hny_entity_alive 
  */
-bool fks_entity_destroy(fks_world_t* wrld, fks_entity_t ntt);
+bool hny_entity_destroy(hny_world_t* wrld, hny_entity_t ntt);
 
 /**
  * @brief Checks if an entity is "alive"
- * @details An entity is alive if it has been returned by @ref fks_entity_create and not
- * destroyed by @ref fks_entity_destroy since. Entities with the same id have differing
+ * @details An entity is alive if it has been returned by @ref hny_entity_create and not
+ * destroyed by @ref hny_entity_destroy since. Entities with the same id have differing
  * generation bits which makes id recycling effective, with only an extraordinarily rare
  * chance of a false positive from this function.
  * 
@@ -94,7 +94,7 @@ bool fks_entity_destroy(fks_world_t* wrld, fks_entity_t ntt);
  * @param ntt Entity to check
  * @return bool True if world and entity are valid, and entity is alive in the world
  */
-bool fks_entity_alive(const fks_world_t* wrld, fks_entity_t ntt);
+bool hny_entity_alive(const hny_world_t* wrld, hny_entity_t ntt);
 
 /**
  * @brief Registers a new component 
@@ -103,10 +103,10 @@ bool fks_entity_alive(const fks_world_t* wrld, fks_entity_t ntt);
  * 
  * @param wrld ECS world
  * @param size Size of component data payload
- * @return fks_component_t Registered component
- * @retval FKS_NULL_COMPONENT wrld is NULL or component limit has been reached
+ * @return hny_component_t Registered component
+ * @retval HNY_NULL_COMPONENT wrld is NULL or component limit has been reached
  */
-fks_component_t fks_component_register(fks_world_t* wrld, uint32_t size);
+hny_component_t hny_component_register(hny_world_t* wrld, uint32_t size);
 
 /**
  * @brief Enables component creation
@@ -116,7 +116,7 @@ fks_component_t fks_component_register(fks_world_t* wrld, uint32_t size);
  * @param wrld ECS world
  * @param cmp Component to enable
  */
-void fks_component_enable(fks_world_t* wrld, fks_component_t cmp);
+void hny_component_enable(hny_world_t* wrld, hny_component_t cmp);
 
 /**
  * @brief Disables component creation
@@ -125,22 +125,22 @@ void fks_component_enable(fks_world_t* wrld, fks_component_t cmp);
  * @param wrld ECS world 
  * @param cmp Component to disable
  */
-void fks_component_disable(fks_world_t* wrld, fks_component_t cmp);
+void hny_component_disable(hny_world_t* wrld, hny_component_t cmp);
 
 /**
  * @brief Get a list of entities that have a component
- * @details Gives a fks_entity_t* list of entities that have a component. The size of the list
+ * @details Gives a hny_entity_t* list of entities that have a component. The size of the list
  * is returned in the function parameter rsize. Should rsize be NULL this function will effectively
- * do nothing. The return pointer can be invalidated after calling @ref fks_entity_add_component,
- * @ref fks_entity_remove_component, and @ref fks_entity_destroy.
+ * do nothing. The return pointer can be invalidated after calling @ref hny_entity_add_component,
+ * @ref hny_entity_remove_component, and @ref hny_entity_destroy.
  * 
  * @param wrld ECS world
  * @param cmp Given component
  * @param rsize Entity list size
- * @return const fks_entity_t* List of entities
+ * @return const hny_entity_t* List of entities
  * @retval NULL if wrld, cmp, or rsize are invalid/NULL
  */
-const fks_entity_t* fks_component_get_entities(const fks_world_t* wrld, fks_component_t cmp, size_t* rsize);
+const hny_entity_t* hny_component_get_entities(const hny_world_t* wrld, hny_component_t cmp, size_t* rsize);
 
 /**
  * @brief Adds a component to an entity
@@ -154,7 +154,7 @@ const fks_entity_t* fks_component_get_entities(const fks_world_t* wrld, fks_comp
  * @param data Component data
  * @return bool true if data is added and entity is updated, false if not
  */
-bool fks_entity_add_component(fks_world_t* wrld, fks_entity_t ntt, fks_component_t cmp, const void* data);
+bool hny_entity_add_component(hny_world_t* wrld, hny_entity_t ntt, hny_component_t cmp, const void* data);
 
 /**
  * @brief Removes a component from an entity
@@ -166,7 +166,7 @@ bool fks_entity_add_component(fks_world_t* wrld, fks_entity_t ntt, fks_component
  * @param cmp Component to remove
  * @return bool true if component was removed, false if not
  */
-bool fks_entity_remove_component(fks_world_t* wrld, fks_entity_t ntt, fks_component_t cmp);
+bool hny_entity_remove_component(hny_world_t* wrld, hny_entity_t ntt, hny_component_t cmp);
 
 /**
  * @brief Checks if an entity has a component
@@ -176,20 +176,20 @@ bool fks_entity_remove_component(fks_world_t* wrld, fks_entity_t ntt, fks_compon
  * @param cmp Component to check
  * @return bool Whether the entity has the component or not, or if inputs aren't valid
  */
-bool fks_entity_has_component(const fks_world_t* wrld, fks_entity_t ntt, fks_component_t cmp);
+bool hny_entity_has_component(const hny_world_t* wrld, hny_entity_t ntt, hny_component_t cmp);
 
 /**
  * @brief Gets component data from an entity
  * @details Does not return size, as it should be known by the caller. Calling memory past the size
  * of a single component is undefined. Pointers from this function can be invalidated after calling
- * @ref fks_entity_add_component, @ref fks_entity_remove_component, and @ref fks_entity_destroy.
+ * @ref hny_entity_add_component, @ref hny_entity_remove_component, and @ref hny_entity_destroy.
  * 
  * @param wrld ECS world
  * @param ntt Entity to retrieve data from
  * @param cmp Component data type to retrieve
  * @return void* Data if present, NULL if invalid
  */
-void* fks_entity_get_component(const fks_world_t* wrld, fks_entity_t ntt, fks_component_t cmp);
+void* hny_entity_get_component(const hny_world_t* wrld, hny_entity_t ntt, hny_component_t cmp);
 
 #ifdef __cplusplus
 }
