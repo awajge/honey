@@ -43,6 +43,9 @@ typedef fks_esl0*           fks_esl1[FKS_ESL1_PAGE_SIZE];
 #define FKS_CSS2_IDX(ntt)   (((FKS_ID(ntt)) >> (FKS_CSS0_PAGE_BITS + FKS_CSS1_PAGE_BITS)) & (FKS_CSS2_PAGE_SIZE - 1))
 #define FKS_CSS(cmpd, ntt)  ((*(*(cmpd)->css[FKS_CSS2_IDX(ntt)])[FKS_CSS1_IDX(ntt)])[FKS_CSS0_IDX(ntt)])
 
+#define FKS_CSS0_CALLOC(css0ptr) ((css0ptr) = calloc(FKS_CSS0_PAGE_SIZE, sizeof **(css0ptr)))
+#define FKS_CSS1_CALLOC(css1ptr) ((css1ptr) = calloc(FKS_CSS1_PAGE_SIZE, sizeof **(css1ptr)))
+
 typedef fks_entity_id_t     fks_css0[FKS_CSS0_PAGE_SIZE];
 typedef fks_css0*           fks_css1[FKS_CSS1_PAGE_SIZE];
 typedef fks_css1*           fks_css2[FKS_CSS2_PAGE_SIZE];
@@ -57,7 +60,7 @@ typedef fks_css1*           fks_css2[FKS_CSS2_PAGE_SIZE];
 #define FKS_LOG_MAX_BUF_SIZE            128
 
 #define FKS_LOG(loglv, errt, ...)       fks_error(#loglv, errt, __func__, __LINE__, __VA_ARGS__)
-#define FKS_LOG_GENERAL(loglv, msg)     FKS_LOG(loglv, "General", (msg))
+#define FKS_LOG_GENERAL(loglv, msg)     FKS_LOG(loglv, "General", "%s", (msg))
 #define FKS_LOG_BAD_INPUT(rec, type)    FKS_LOG(FKS_WARNING, "Input", "Bad input: %s for %s", (rec), (type))
 #define FKS_LOG_NULL_INPUT(type)        FKS_LOG_BAD_INPUT("NULL", (type))
 #define FKS_LOG_ALLOC(type)             FKS_LOG(FKS_ERROR, "Alloc", "Failed to allocate resource: %s", (type))
@@ -86,7 +89,7 @@ struct fks_world_t {
     fks_esl1 esl;                                    /**< Entity State List       */
     fks_component_data_t* cdr[FKS_COMPONENT_LIMIT];  /**< Component Data Registry */
 
-    uint32_t nttc;                                   /**< Entity Count             */
+    size_t nttc;                                     /**< Entity Count             */
     fks_entity_id_t nfe;                             /**< Next Free Entity         */
     fks_entity_id_t ehwm;                            /**< Entity High Watermark    */
     fks_component_t chwm;                            /**< Component High Watermark */
@@ -144,17 +147,19 @@ void fks_world_fini(fks_world_t* wrld) {
     fks_component_data_t* cmpd; fks_css1* tssl1;
     for (size_t cmp = 1; cmp <= wrld->chwm; ++cmp) {
         cmpd = wrld->cdr[cmp];
-        for (size_t i = 0; i < FKS_CSS2_PAGE_SIZE; ++i)
+        for (size_t i = 0; i < FKS_CSS2_PAGE_SIZE; ++i) {
             if ((tssl1 = cmpd->css[i]))
                 for (size_t j = 0; j < FKS_CSS1_PAGE_SIZE; ++j) free((*tssl1)[j]);
-        free(cmpd->rds), free(cmpd->cds);
+                free(tssl1);
+        }
+        free(cmpd->rds), free(cmpd->cds), free(cmpd);
     }
 
     free(wrld);
 }
 
-uint32_t fks_world_entity_count(const fks_world_t* wrld) {
-    return wrld_valid(wrld) ? wrld->nttc : UINT32_MAX;
+size_t fks_world_entity_count(const fks_world_t* wrld) {
+    return wrld_valid(wrld) ? wrld->nttc : SIZE_MAX;
 }
 
 fks_entity_t fks_entity_create(fks_world_t* wrld) {
@@ -168,17 +173,17 @@ fks_entity_t fks_entity_create(fks_world_t* wrld) {
         return (FKS_ESL(wrld, _nfe) & ~FKS_ID_MASK) | _nfe;
     } else {
         if (wrld->ehwm == FKS_ID_MASK) return FKS_LOG_GENERAL(FKS_ERROR, "Entity limit reached"), FKS_NULL_ENTITY;
-        if (!(wrld->ehwm % (FKS_ESL0_PAGE_SIZE - 1) || FKS_ESL0_CALLOC(wrld->esl[FKS_ESL1_IDX(wrld->ehwm + 1)])))
+        if (!(wrld->ehwm && ((wrld->ehwm + 1) & (FKS_ESL0_PAGE_SIZE - 1))) && !FKS_ESL0_CALLOC(wrld->esl[FKS_ESL1_IDX(wrld->ehwm + 1)]))
             return FKS_LOG_ALLOC("fks_esl0*"), FKS_NULL_ENTITY;
-        
-        return wrld->nttc++, ++wrld->ehwm;
+
+            return wrld->nttc++, ++wrld->ehwm;
     }
 }
 
 bool fks_entity_destroy(fks_world_t* wrld, fks_entity_t ntt) {
     if (!wrld_ntt_valid(wrld, ntt)) return false;
 
-    for (fks_component_t cmp = 1; cmp <= wrld->chwm; ++cmp) fks_entity_remove_component(wrld, ntt, cmp);
+    for (size_t cmp = 1; cmp <= wrld->chwm; ++cmp) fks_entity_remove_component(wrld, ntt, (fks_component_t) cmp);
     FKS_ESL(wrld, ntt) = ((FKS_ESL(wrld, ntt) & ~FKS_ID_MASK) + FKS_ID_LIMIT) | wrld->nfe;
     wrld->nfe = FKS_ID(ntt);
     return wrld->nttc--, true;
@@ -186,14 +191,15 @@ bool fks_entity_destroy(fks_world_t* wrld, fks_entity_t ntt) {
 
 bool fks_entity_alive(const fks_world_t* wrld, fks_entity_t ntt) {
     if (!wrld_valid(wrld))      return false;
-    if (!(ntt &= FKS_ID_MASK))  return FKS_LOG_NULL_INPUT("fks_entity_t"), false;
-    
     fks_entity_t ntto = ntt;
+    if (!(ntt &= FKS_ID_MASK))  return false;
+    
     return (ntt <= wrld->ehwm) && !((ntto ^ (FKS_ESL(wrld, ntt))) & ~FKS_ID_MASK);
 }
 
 fks_component_t fks_component_register(fks_world_t* wrld, uint32_t size) {
     if (!wrld_valid(wrld))                  return FKS_NULL_COMPONENT;
+    if (!size)                              return FKS_LOG_NULL_INPUT("uint32_t"), FKS_NULL_COMPONENT;
     if (wrld->chwm == FKS_COMPONENT_MAX)    return FKS_LOG_GENERAL(FKS_ERROR, "Component limit reached"), FKS_NULL_COMPONENT;
     if (!(wrld->cdr[wrld->chwm + 1] = calloc(1, sizeof **wrld->cdr)))
         return FKS_LOG_ALLOC("fks_component_data*"), FKS_NULL_COMPONENT;
@@ -221,7 +227,7 @@ void fks_component_disable(fks_world_t* wrld, fks_component_t cmp) {
     if (wrld_cmp_valid(wrld, cmp)) wrld->cdr[cmp]->ccs = false;
 }
 
-const fks_entity_t* fks_component_get_entities(const fks_world_t* wrld, fks_component_t cmp, uint32_t* rsize) {
+const fks_entity_t* fks_component_get_entities(const fks_world_t* wrld, fks_component_t cmp, size_t* rsize) {
     if (!rsize)                     return FKS_LOG_NULL_INPUT("uint32_t*"), NULL;
     if (!wrld_cmp_valid(wrld, cmp)) return NULL;
 
@@ -237,24 +243,29 @@ bool fks_entity_add_component(fks_world_t* wrld, fks_entity_t ntt, fks_component
     if (!cmpd->ccs) return false;
 
     fks_css1** l1p; fks_css0** l0p; fks_entity_id_t* eidp;
-    if (!*(l1p = &cmpd->css[FKS_CSS2_IDX(ntt)]) && !(*l1p = calloc(1, sizeof **l1p))) return FKS_LOG_ALLOC("fks_css1*"), false;
-    if (!*(l0p =   &(**l1p)[FKS_CSS1_IDX(ntt)]) && !(*l0p = calloc(1, sizeof **l0p))) return FKS_LOG_ALLOC("fks_css0*"), false;
+    if (!*(l1p = &cmpd->css[FKS_CSS2_IDX(ntt)]) && !FKS_CSS1_CALLOC(*l1p)) return FKS_LOG_ALLOC("fks_css1*"), false;
+    if (!*(l0p =   &(**l1p)[FKS_CSS1_IDX(ntt)]) && !FKS_CSS0_CALLOC(*l0p)) return FKS_LOG_ALLOC("fks_css0*"), false;
     if ( *(eidp =  &(**l0p)[FKS_CSS0_IDX(ntt)]))
         return FKS_LOG_GENERAL(FKS_WARNING, "Entity already contains component"), false;
 
+    void *fcds = NULL, *frds = NULL;
     if (cmpd->nfs >= cmpd->dsc) {
-        void* ncds; fks_entity_t* nrds;
-        if (!(ncds = calloc(cmpd->dsc * 2, cmpd->scs)))         return FKS_LOG_ALLOC("void*"), false;
-        if (!(nrds = calloc(cmpd->dsc * 2, sizeof *cmpd->rds))) return free(ncds), FKS_LOG_ALLOC("fks_entity_t*"), false;
+        void* _cds; fks_entity_t* _rds;
+        if (cmpd->dsc > FKS_ID_LIMIT / 2)
+            return FKS_LOG_GENERAL(FKS_ERROR, "component capacity limit reached"), false;
+        fks_entity_id_t _dsc = cmpd->dsc * 2;
+        if (!(_cds = calloc(_dsc, cmpd->scs)))         return FKS_LOG_ALLOC("void*"), false;
+        if (!(_rds = calloc(_dsc, sizeof *cmpd->rds))) return free(_cds), FKS_LOG_ALLOC("fks_entity_t*"), false;
 
-        memcpy(ncds, cmpd->cds, cmpd->dsc * cmpd->scs);
-        memcpy(nrds, cmpd->rds, cmpd->dsc * sizeof *cmpd->rds);
+        memcpy(_cds, cmpd->cds, (size_t) cmpd->dsc * cmpd->scs);
+        memcpy(_rds, cmpd->rds, (size_t) cmpd->dsc * sizeof *cmpd->rds);
         
-        free(cmpd->cds), free(cmpd->rds);
-        cmpd->cds = ncds, cmpd->rds = nrds, cmpd->dsc *= 2;
+        fcds = cmpd->cds, frds = cmpd->rds;
+        cmpd->cds = _cds, cmpd->rds = _rds, cmpd->dsc = _dsc;
     }
 
-    memcpy((fks_uc*) cmpd->cds + (cmpd->nfs * cmpd->scs), data, cmpd->scs);
+    memcpy((fks_uc*) cmpd->cds + (size_t) cmpd->nfs * cmpd->scs, data, cmpd->scs);
+    free(fcds), free(frds);
     cmpd->rds[cmpd->nfs] = ntt;
     *eidp = ++cmpd->nfs;
 
@@ -301,7 +312,7 @@ void* fks_entity_get_component(const fks_world_t* wrld, fks_entity_t ntt, fks_co
     fks_component_data_t* cmpd = wrld->cdr[cmp];
     fks_css1* l1; fks_css0* l0; fks_entity_id_t eid;
     if (!(l1 = cmpd->css[FKS_CSS2_IDX(ntt)]) || !(l0 = (*l1)[FKS_CSS1_IDX(ntt)]) || !(eid = (*l0)[FKS_CSS0_IDX(ntt)]))
-        return FKS_LOG_GENERAL(FKS_WARNING, "Entity does not contain component"), NULL;
+        return NULL;
 
     return (fks_uc*) cmpd->cds + (eid - 1) * cmpd->scs;
 }

@@ -12,6 +12,10 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /** Null entity represents the lack of an entity */
 #define FKS_NULL_ENTITY ((fks_entity_t) 0u)
 
@@ -47,14 +51,14 @@ void fks_world_fini(fks_world_t* wrld);
  * 
  * @param wrld ECS world
  *
- * @return uint32_t [0, UINT32_MAX-1] entity count
- * @retval UINT32_MAX wrld is NULL
+ * @return size_t [0, UINT32_MAX] entity count
+ * @retval SIZE_MAX if wrld is NULL
  */
-uint32_t fks_world_entity_count(const fks_world_t* wrld);
+size_t fks_world_entity_count(const fks_world_t* wrld);
 
 /**
  * @brief Creates a new entity
- * @details This function recycles the id of the most recently destroyed entity from
+ * @details This function recycles the id of the most recently destroyed entity
  * while incrementing its generation bits by 1. If there are no ids left to recycle,
  * this function returns a new id with a generation id of 0. When generation bits reach
  * UINT32_MAX+1, it wraps around back to 0.  
@@ -82,7 +86,7 @@ bool fks_entity_destroy(fks_world_t* wrld, fks_entity_t ntt);
 /**
  * @brief Checks if an entity is "alive"
  * @details An entity is alive if it has been returned by @ref fks_entity_create and not
- * destroyed by @ref fks_entity_destroy since. Entitys with the same id have differing
+ * destroyed by @ref fks_entity_destroy since. Entities with the same id have differing
  * generation bits which makes id recycling effective, with only an extraordinarily rare
  * chance of a false positive from this function.
  * 
@@ -94,12 +98,13 @@ bool fks_entity_alive(const fks_world_t* wrld, fks_entity_t ntt);
 
 /**
  * @brief Registers a new component 
- * @details This function simply increments a counter to return component ids.
+ * @details This function simply increments a counter to return component ids. size must
+ * not be 0, this function can fail on a couple different allocations.
  * 
  * @param wrld ECS world
  * @param size Size of component data payload
  * @return fks_component_t Registered component
- * @retval NULL_COMPONENT wrld is NULL or component limit has been reached
+ * @retval FKS_NULL_COMPONENT wrld is NULL or component limit has been reached
  */
 fks_component_t fks_component_register(fks_world_t* wrld, uint32_t size);
 
@@ -115,7 +120,7 @@ void fks_component_enable(fks_world_t* wrld, fks_component_t cmp);
 
 /**
  * @brief Disables component creation
- * @details This function disables entities from have this component.
+ * @details This function disables entities from having this component.
  * 
  * @param wrld ECS world 
  * @param cmp Component to disable
@@ -126,7 +131,8 @@ void fks_component_disable(fks_world_t* wrld, fks_component_t cmp);
  * @brief Get a list of entities that have a component
  * @details Gives a fks_entity_t* list of entities that have a component. The size of the list
  * is returned in the function parameter rsize. Should rsize be NULL this function will effectively
- * do nothing.
+ * do nothing. The return pointer can be invalidated after calling @ref fks_entity_add_component,
+ * @ref fks_entity_remove_component, and @ref fks_entity_destroy.
  * 
  * @param wrld ECS world
  * @param cmp Given component
@@ -134,13 +140,13 @@ void fks_component_disable(fks_world_t* wrld, fks_component_t cmp);
  * @return const fks_entity_t* List of entities
  * @retval NULL if wrld, cmp, or rsize are invalid/NULL
  */
-const fks_entity_t* fks_component_get_entities(const fks_world_t* wrld, fks_component_t cmp, uint32_t* rsize);
+const fks_entity_t* fks_component_get_entities(const fks_world_t* wrld, fks_component_t cmp, size_t* rsize);
 
 /**
  * @brief Adds a component to an entity
  * @details Will do nothing if the component is disabled, or the entity already contains
- * the component. Data is automatically truncated to the component size. Responsibility
- * of making sure data is proper size is given to the caller.
+ * the component. Responsibility of possible over-reading and making sure data is proper
+ * size is given to the caller.
  * 
  * @param wrld ECS world 
  * @param ntt Entity to update
@@ -152,8 +158,8 @@ bool fks_entity_add_component(fks_world_t* wrld, fks_entity_t ntt, fks_component
 
 /**
  * @brief Removes a component from an entity
- * @details Will remove data whether or not the component is enabled/disabled. Also will not log
- * whether or not the entity is alive or not.
+ * @details Will remove data whether or not the component is enabled/disabled. Does not log even
+ * if the given entity does not contain the given component.
  * 
  * @param wrld ECS world 
  * @param ntt Entity to update
@@ -175,7 +181,8 @@ bool fks_entity_has_component(const fks_world_t* wrld, fks_entity_t ntt, fks_com
 /**
  * @brief Gets component data from an entity
  * @details Does not return size, as it should be known by the caller. Calling memory past the size
- * of a single component is undefined.
+ * of a single component is undefined. Pointers from this function can be invalidated after calling
+ * @ref fks_entity_add_component, @ref fks_entity_remove_component, and @ref fks_entity_destroy.
  * 
  * @param wrld ECS world
  * @param ntt Entity to retrieve data from
@@ -183,5 +190,9 @@ bool fks_entity_has_component(const fks_world_t* wrld, fks_entity_t ntt, fks_com
  * @return void* Data if present, NULL if invalid
  */
 void* fks_entity_get_component(const fks_world_t* wrld, fks_entity_t ntt, fks_component_t cmp);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
