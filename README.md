@@ -6,18 +6,16 @@ a simple sparse/dense set ECS implementation.
  - simple entity creation deletion + component registration w/ payload
  - smart entity recycling -> memory won't skyrocket with elongated usage
  - optimized preprocessor utilization implementation -> no extra runtime overhead
- - full doxygen documentation - run 'doxygen Doxyfile' & open index.html in build/doxygen/html
+ - full doxygen documentation - run 'make docs' & open index.html in build/doxygen/html
  - modular build - self-contained 'world' struct contains everything
  - portability: ISO c99, no external libs, no gcc/clang builtins, simple c++ support 
  - full stderr logging system for errors & warnings
  - more coming soon... (multi-component querying, 'tag' components)
 
-### startup:
- - include honey.h then run hny_init() to get your ecs world. make sure to run hny_fini() once you're done to avoid memory leaks
- - compile with honey.c in your project
+### changes (v2.2):
+ - new build system/documentation/.gitignore
 
-### changes (v2.1):
- - bugfixes/readme updates/document updates/c++ support
----
-#### I recommend installing [Makefile](https://www.gnu.org/software/make/) to build & run.
-#### Run 'doxygen Doxyfile' & open index.html in build/doxygen/html for documentation.
+### build:
+ - 'make' | 'make all' for lib (libhoney.a)
+ - 'make docs' for documentation (open docs/html/index.html)
+ - 'make clean' to clean up both
