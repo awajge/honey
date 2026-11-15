@@ -1,21 +1,23 @@
-a simple sparse/dense set ECS implementation.
+a sparse/dense set ECS implementation built around the idea of making a simple, non-threatening ECS that 1. is simple to use 2.provides core ECS functionality and 3. accomodates all games types, AAA to pong.
 
-### features:
- - 2^32 entity limit (~4 billion) + 32 generation bits -> no stale entity issues
- - low memory overhead + automatic memory allocation -> only pay for what you need
- - simple entity creation deletion + component registration w/ payload
- - smart entity recycling -> memory won't skyrocket with elongated usage
- - optimized preprocessor utilization implementation -> no extra runtime overhead
- - full doxygen documentation - run 'make docs' & open index.html in build/doxygen/html
- - modular build - self-contained 'world' struct contains everything
- - portability: ISO c99, no external libs, no gcc/clang builtins, simple c++ support 
+## features
+ - 4,294,967,295 entity limit
+ - 65,535 component limit
+ - low static memory overhead
  - full stderr logging system for errors & warnings
- - more coming soon... (multi-component querying, 'tag' components)
+ - modular design supports multiple ECS instances
+ - easy to use Makefile build system
+ - full doxygen documentation
+ - ISO c99, only std libs, no compiler builtins, simple c++ support 
+ - more coming soon... (CMake support, multi-component querying, tag components)
 
-### changes (v2.2):
+## changes (v2.2)
  - complete build system for static library & Doxygen documentation
 
-### build:
- - 'make' or 'make build' for lib (libhoney.a)
- - 'make docs' for documentation (open docs/html/index.html)
+## build
+ - install [Makefile](https://www.gnu.org/software/make/)
+ - 'make' or 'make build' for lib (libhoney.a) - use honey.h in include/
+ - 'make docs' for documentation (open docs/index.html)
  - 'make clean' to clean up both
+
+shoutout [Flecs](https://github.com/sandermertens/flecs) & [EnTT](https://github.com/skypjack/entt) for a TON of inspiration behind many of the design choices :)

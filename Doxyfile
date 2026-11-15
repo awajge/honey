@@ -1,5 +1,6 @@
-PROJECT_NAME            = "Honey"
+PROJECT_NAME            = "Honey ECS"
 OUTPUT_DIRECTORY        = docs
+HTML_OUTPUT             = .
 
 INPUT                   = include/ README.md
 FILE_PATTERNS           = *.h *.md
