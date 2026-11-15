@@ -13,9 +13,9 @@ a simple sparse/dense set ECS implementation.
  - more coming soon... (multi-component querying, 'tag' components)
 
 ### changes (v2.2):
- - new build system/documentation/.gitignore
+ - complete build system for static library & Doxygen documentation
 
 ### build:
- - 'make' | 'make all' for lib (libhoney.a)
+ - 'make' or 'make build' for lib (libhoney.a)
  - 'make docs' for documentation (open docs/html/index.html)
  - 'make clean' to clean up both
