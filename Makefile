@@ -1,6 +1,6 @@
 CC		= cc
 AR		= ar
-CFLAGS	= -std=c99 -Wall -Wextra -Iinclude -O2
+CFLAGS	= -std=c99 -Wall -Wextra -Wpedantic -Wno-unused-variable -Iinclude -O2
 
 SRC_DIR = src
 BLD_DIR = build
@@ -8,7 +8,8 @@ DOC_DIR = docs
 OBJ_DIR	= $(BLD_DIR)/obj
 LIB_DIR = $(BLD_DIR)/lib
 
-TARGET 	= $(LIB_DIR)/libhoney.a
+NAME	= honey
+TARGET 	= $(LIB_DIR)/lib$(NAME).a
 SRCS	= $(wildcard $(SRC_DIR)/*.c)
 OBJS	= $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 

@@ -11,6 +11,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
+#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -141,6 +142,26 @@ void hny_component_disable(hny_world_t* wrld, hny_component_t cmp);
  * @retval NULL if wrld, cmp, or rsize are invalid/NULL
  */
 const hny_entity_t* hny_component_get_entities(const hny_world_t* wrld, hny_component_t cmp, size_t* rsize);
+
+/**
+ * @brief Gets a list of entities that have a specific set of components
+ * @details If the component set or return size ptr is NULL, number of components is below 1, or any
+ * of the components is invalid in the given world, this function will return NULL, and rsize is not
+ * guaranteed to have any value, and will often be unchanged from when the function was called. If this
+ * is not the case then the function runs as intended and the returned pointer is guaranteed to have
+ * rsize number of entities that match the given component set. Should there be no matching entities
+ * rsize will be 0 and there will be a non-NULL return pointer, but with undefined data should you
+ * dereference it. Unlike @ref hny_component_get_entities this function currently leaves the onus of
+ * freeing the returned buffer on the caller.
+ * 
+ * @param wrld ECS world
+ * @param cmps Given component set
+ * @param ncmps Number of components in set
+ * @param rsize Entity list size
+ * @return hny_entity_t* List of entities
+ * @retval NULL if error in any of params 
+ */
+hny_entity_t* hny_components_get_entities(const hny_world_t* wrld, const hny_component_t* cmps, size_t ncmps, size_t* rsize);
 
 /**
  * @brief Adds a component to an entity
