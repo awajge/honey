@@ -1,6 +1,6 @@
 CC		= cc
 AR		= ar
-CFLAGS	= -std=c99 -Wall -Wextra -Wpedantic -Wno-unused-variable -Iinclude -O2
+CFLAGS	= -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2
 
 SRC_DIR = src
 BLD_DIR = build

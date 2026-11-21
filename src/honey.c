@@ -1,4 +1,5 @@
 #include "honey.h"
+#include "internal.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -10,7 +11,7 @@
 #define HNY_STATIC_ASSERT(name, expr) typedef char name[(expr) ? 1 : -1];
 
 /* =============== Entity ID =============== */
-typedef uint32_t        hny_entity_id_t;
+typedef u32             hny_entity_id_t;
 
 #define HNY_ID_BITS     (sizeof(hny_entity_id_t) * CHAR_BIT)
 #define HNY_ID_LIMIT    (1ull << HNY_ID_BITS)
@@ -87,20 +88,17 @@ HNY_STATIC_ASSERT(hny_log_max_buf_size_g0, HNY_LOG_MAX_BUF_SIZE > 0)
 // ===== FATALS
 
 // ===== ERRORS
-#define HNY_LOG_ALLOC(type)             HNY_LOG(HNY_ERROR, "Alloc", "Failed to allocate resource: %s", (type))
+#define HNY_LOG_ALLOC(type)             HNY_LOG(HNY_LOG_ERROR, "Alloc", "Failed to allocate resource: %s", (type))
 
 // ===== WARNINGS
-#define HNY_LOG_BAD_INPUT(rec, type)    HNY_LOG(HNY_WARNING, "Input", "Bad input: %s for %s", (rec), (type))
+#define HNY_LOG_BAD_INPUT(rec, type)    HNY_LOG(HNY_LOG_WARNING, "Input", "Bad input: %s for %s", (rec), (type))
 #define HNY_LOG_NULL_INPUT(type)        HNY_LOG_BAD_INPUT("NULL", (type))
 
 typedef enum {
-    HNY_WARNING,
-    HNY_ERROR,
-    HNY_FATAL
+    HNY_LOG_WARNING,
+    HNY_LOG_ERROR,
+    HNY_LOG_FATAL
 } hny_log_level;
-
-/* =============== General ===============*/
-typedef unsigned char hny_uc;
 
 /* =============== Structs =============== */
 typedef struct hny_component_data_t {
@@ -201,7 +199,7 @@ hny_entity_t hny_entity_create(hny_world_t* wrld) {
         
         return (HNY_ESL(wrld, _nfe) & ~HNY_ID_MASK) | _nfe;
     } else {
-        if (wrld->ehwm == HNY_ID_MASK) return HNY_LOG_GENERAL(HNY_ERROR, "Entity limit reached"), HNY_NULL_ENTITY;
+        if (wrld->ehwm == HNY_ID_MASK) return HNY_LOG_GENERAL(HNY_LOG_ERROR, "Entity limit reached"), HNY_NULL_ENTITY;
         if (!(wrld->ehwm && ((wrld->ehwm + 1) & (HNY_ESL0_PAGE_SIZE - 1))) && !HNY_ESL0_CALLOC(wrld->esl[HNY_ESL1_IDX(wrld->ehwm + 1)]))
             return HNY_LOG_ALLOC("hny_esl0*"), HNY_NULL_ENTITY;
 
@@ -229,7 +227,7 @@ bool hny_entity_alive(const hny_world_t* wrld, hny_entity_t ntt) {
 hny_component_t hny_component_register(hny_world_t* wrld, uint32_t size) {
     if (!wrld_valid(wrld))                  return HNY_NULL_COMPONENT;
     if (!size)                              return HNY_LOG_NULL_INPUT("size_t"), HNY_NULL_COMPONENT;
-    if (wrld->chwm == HNY_COMPONENT_MAX)    return HNY_LOG_GENERAL(HNY_ERROR, "Component limit reached"), HNY_NULL_COMPONENT;
+    if (wrld->chwm == HNY_COMPONENT_MAX)    return HNY_LOG_GENERAL(HNY_LOG_ERROR, "Component limit reached"), HNY_NULL_COMPONENT;
     if (!(wrld->cdr[wrld->chwm + 1] = calloc(1, sizeof **wrld->cdr)))
         return HNY_LOG_ALLOC("hny_component_data*"), HNY_NULL_COMPONENT;
 
@@ -301,13 +299,13 @@ bool hny_entity_add_component(hny_world_t* wrld, hny_entity_t ntt, hny_component
     if (!*(l1p = &cmpd->css[HNY_CSS2_IDX(ntt)]) && !HNY_CSS1_CALLOC(*l1p)) return HNY_LOG_ALLOC("hny_css1*"), false;
     if (!*(l0p =   &(**l1p)[HNY_CSS1_IDX(ntt)]) && !HNY_CSS0_CALLOC(*l0p)) return HNY_LOG_ALLOC("hny_css0*"), false;
     if ( *(eidp =  &(**l0p)[HNY_CSS0_IDX(ntt)]))
-        return HNY_LOG_GENERAL(HNY_WARNING, "Entity already contains component"), false;
+        return HNY_LOG_GENERAL(HNY_LOG_WARNING, "Entity already contains component"), false;
 
     void *fcds = NULL, *frds = NULL;
     if (cmpd->nfs >= cmpd->dsc) {
         void* _cds; hny_entity_t* _rds;
         if (cmpd->dsc > HNY_ID_LIMIT / 2)
-            return HNY_LOG_GENERAL(HNY_ERROR, "component capacity limit reached"), false;
+            return HNY_LOG_GENERAL(HNY_LOG_ERROR, "component capacity limit reached"), false;
         hny_entity_id_t _dsc = cmpd->dsc * 2;
         if (!(_cds = calloc(_dsc, cmpd->scs)))         return HNY_LOG_ALLOC("void*"), false;
         if (!(_rds = calloc(_dsc, sizeof *cmpd->rds))) return free(_cds), HNY_LOG_ALLOC("hny_entity_t*"), false;
@@ -319,7 +317,7 @@ bool hny_entity_add_component(hny_world_t* wrld, hny_entity_t ntt, hny_component
         cmpd->cds = _cds, cmpd->rds = _rds, cmpd->dsc = _dsc;
     }
 
-    memcpy((hny_uc*) cmpd->cds + (size_t) cmpd->nfs * cmpd->scs, data, cmpd->scs);
+    memcpy((uc*) cmpd->cds + (size_t) cmpd->nfs * cmpd->scs, data, cmpd->scs);
     free(fcds), free(frds);
     cmpd->rds[cmpd->nfs] = ntt;
     *eidp = ++cmpd->nfs;
@@ -336,15 +334,15 @@ bool hny_entity_remove_component(hny_world_t* wrld, hny_entity_t ntt, hny_compon
 
     if (*eidp != cmpd->nfs) {
         memcpy(
-            (hny_uc*) cmpd->cds + (*eidp - 1) * cmpd->scs,
-            (hny_uc*) cmpd->cds + (cmpd->nfs - 1) * cmpd->scs,
+            (uc*) cmpd->cds + (*eidp - 1) * cmpd->scs,
+            (uc*) cmpd->cds + (cmpd->nfs - 1) * cmpd->scs,
             cmpd->scs
         );
         HNY_CSS(cmpd, cmpd->rds[cmpd->nfs - 1]) = *eidp;
         cmpd->rds[*eidp - 1] = cmpd->rds[cmpd->nfs - 1];
     }
 
-    memset((hny_uc*) cmpd->cds + (cmpd->nfs - 1) * cmpd->scs, 0, cmpd->scs);
+    memset((uc*) cmpd->cds + (cmpd->nfs - 1) * cmpd->scs, 0, cmpd->scs);
     cmpd->rds[--cmpd->nfs] = HNY_NULL_ENTITY;
     *eidp = HNY_ID(HNY_NULL_ENTITY);
 
@@ -369,5 +367,5 @@ void* hny_entity_get_component(const hny_world_t* wrld, hny_entity_t ntt, hny_co
     if (!(l1 = cmpd->css[HNY_CSS2_IDX(ntt)]) || !(l0 = (*l1)[HNY_CSS1_IDX(ntt)]) || !(eid = (*l0)[HNY_CSS0_IDX(ntt)]))
         return NULL;
 
-    return (hny_uc*) cmpd->cds + (eid - 1) * cmpd->scs;
+    return (uc*) cmpd->cds + (eid - 1) * cmpd->scs;
 }
