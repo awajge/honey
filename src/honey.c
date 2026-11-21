@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
-
 #include <limits.h>
 
 #define HNY_STATIC_ASSERT(name, expr) typedef char name[(expr) ? 1 : -1];
@@ -94,11 +93,11 @@ HNY_STATIC_ASSERT(hny_log_max_buf_size_g0, HNY_LOG_MAX_BUF_SIZE > 0)
 #define HNY_LOG_BAD_INPUT(rec, type)    HNY_LOG(HNY_LOG_WARNING, "Input", "Bad input: %s for %s", (rec), (type))
 #define HNY_LOG_NULL_INPUT(type)        HNY_LOG_BAD_INPUT("NULL", (type))
 
-typedef enum {
+typedef enum hny_log_t {
     HNY_LOG_WARNING,
     HNY_LOG_ERROR,
     HNY_LOG_FATAL
-} hny_log_level;
+} hny_log_t;
 
 /* =============== Structs =============== */
 typedef struct hny_component_data_t {
