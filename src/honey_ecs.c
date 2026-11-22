@@ -1,4 +1,4 @@
-#include "honey.h"
+#include "honey_ecs.h"
 #include "internal.h"
 
 #include <stdlib.h>

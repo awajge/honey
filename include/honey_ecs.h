@@ -1,5 +1,5 @@
-#ifndef HONEY_H
-#define HONEY_H
+#ifndef HONEY_ECS_H
+#define HONEY_ECS_H
 
 /**
  * @file honey.h
