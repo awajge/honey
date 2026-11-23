@@ -2,86 +2,59 @@
 #define UNICODE
 #endif
 
-#define _WIN32_WINNT 0x0A00 // target win10+
+#define _WIN32_WINNT 0x0A00 // target win10+ FUCK everything else
 
 #include "honey_win32.h"
 #include "internal.h"
 
-#include <stdint.h>
+#include <stddef.h>
 #include <windows.h>
 
 struct hny_icon_t {
     HICON hicon;
-    size_t refc;
 };
 
 struct hny_cursor_t {
     HCURSOR hcursor;
-    size_t refc;
 };
 
 struct hny_window_t {
     HWND hwnd;
     hny_window_callback_fn_t callback;
-    
-    hny_icon_t* ico;
     hny_cursor_t* cur;
-    bool close;
 };
 
 // ===== internal
+static inline wchar* char_to_wchar(const char* str) {
+    if (!str) return NULL;
 
-static inline void icon_destroy(hny_icon_t* icon) {
-    if (!icon) return;
+    int num = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, NULL, 0);
+    if (!num) return NULL;
 
-    DestroyIcon(icon->hicon);
-    free(icon);
-}
+    wchar* wstr = malloc(num * sizeof *wstr);
+    if (!wstr) return NULL;
 
-static inline void cursor_destroy(hny_cursor_t* cursor) {
-    if (!cursor) return;
-
-    DestroyCursor(cursor->hcursor);
-    free(cursor);
+    return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, wstr, num) ? wstr : (free(wstr), NULL);
 }
 
 static inline float dpi_to_scale(UINT dpi) {
     return (float) dpi / 96.0f;
 }
 
-static inline bool vec2_pos(hny_vec2_t vec2) {
-    return vec2.x > 0 && vec2.y > 0;
+static inline bool vec2_ge(hny_vec2_t vec2, int i) {
+    return vec2.x >= i && vec2.y >= i;
 }
 
-LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
     hny_window_t* window = (hny_window_t*) GetWindowLongPtrW(hwnd, GWLP_USERDATA);
 
-    switch (msg) {
-        case WM_NCCREATE: {
-            if ((window = (hny_window_t*) ((CREATESTRUCTW*) lParam)->lpCreateParams)) {
-                window->hwnd = hwnd;
-                SetWindowLongPtrW(hwnd, GWLP_USERDATA, (LONG_PTR) window);
-            }
-            break;
-        }
-
-        case WM_CREATE: {
-            if (window->ico) {
-                SendMessageW(hwnd, WM_SETICON, ICON_BIG,   (LPARAM) window->ico->hicon);
-                SendMessageW(hwnd, WM_SETICON, ICON_SMALL, (LPARAM) window->ico->hicon);
-            }
-            return 0;
-        }
-
-        case WM_DESTROY: {
-            window->close = true;
-            return 0;
-        }
-
+    // === default window behavior
+    if (window) switch (msg) {
         case WM_NCDESTROY: {
             window->hwnd = NULL;
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
-            return 0;
+            free(window);
+            break;
         }
 
         case WM_SETCURSOR: {
@@ -101,7 +74,7 @@ LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             return 1;
         }
 
-        case WM_SYSCOMMAND: {
+        case WM_SYSCOMMAND: { // check this out ==================
             switch (wParam & 0xFFF0) {
                 case SC_SCREENSAVE:
                 case SC_MONITORPOWER:
@@ -110,8 +83,16 @@ LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             }
             break;
         }
-        
-        /* ===== callback-proc messages ===== */ 
+    }
+
+    if (window && window->callback) switch (msg) {
+        case WM_DESTROY: {
+            window->callback(window, &(hny_event_t) {
+                .type = HNY_EVENT_DESTROY
+            });
+            return 0;
+        }
+
         case WM_CLOSE: {
             window->callback(window, &(hny_event_t) {
                 .type = HNY_EVENT_CLOSE
@@ -120,6 +101,7 @@ LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         }
 
         case WM_SIZE: {
+            if (wParam == SIZE_MINIMIZED) return 0;
             window->callback(window, &(hny_event_t) {
                 .type = HNY_EVENT_POSTRESIZE,
                 .u.vec2 = {
@@ -184,7 +166,7 @@ LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             RAWMOUSE m; RAWINPUT ri; UINT size = sizeof ri;
             if (GetRawInputData((HRAWINPUT) lParam, RID_INPUT, &ri, &size, sizeof(RAWINPUTHEADER)) == (UINT) -1) break;
             if (ri.header.dwType != RIM_TYPEMOUSE || (m = ri.data.mouse).usFlags & MOUSE_MOVE_ABSOLUTE) break;
-            
+            if (!m.lLastX && !m.lLastY) break;  
             window->callback(window, &(hny_event_t) {
                 .type = HNY_EVENT_MOUSE_DELTA,
                 .u.vec2 = {
@@ -192,7 +174,7 @@ LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
                     .y = m.lLastY
                 }
             });
-            return 0;
+            break;
         }
 
         case WM_LBUTTONDOWN:
@@ -258,48 +240,111 @@ LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
             });
             return 0;
         }
+    
+        case WM_SIZING: {
+            RECT f = {0}, *r = (RECT*) lParam;
+            AdjustWindowRectExForDpi(
+                &f,
+                (DWORD) GetWindowLongPtrW(hwnd, GWL_STYLE), FALSE,
+                (DWORD) GetWindowLongPtrW(hwnd, GWL_EXSTYLE), GetDpiForWindow(hwnd)
+            );
+
+            hny_event_t e = {
+                .type = HNY_EVENT_USERRESIZE,
+                .u.rect = {
+                    .tl = { .x = r->left   - f.left,  .y = r->top    - f.top },
+                    .br = { .x = r->right  - f.right, .y = r->bottom - f.bottom }
+                }
+            };
+            window->callback(window, &e);
+
+            r->left   = e.u.rect.tl.x + f.left;
+            r->top    = e.u.rect.tl.y + f.top;
+            r->right  = e.u.rect.br.x + f.right;
+            r->bottom = e.u.rect.br.y + f.bottom;
+            return TRUE;
+        }
     }
 
     return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
 // ===== implementation
-hny_icon_t* hny_icon_create(const wchar_t* path, hny_vec2_t size) {
+
+// === icon
+hny_icon_t* hny_icon_create(const char* path, hny_vec2_t size) {
     hny_icon_t* icon = malloc(sizeof(*icon));
     if (!icon) return NULL;
+
+    wchar* wpath = char_to_wchar(path);
+    if (path && !wpath) return free(icon), NULL;
+    if (!path) return *icon = (hny_icon_t) { .hicon = NULL }, icon;
+
     *icon = (hny_icon_t) {
         .hicon = (HICON) LoadImageW(
             NULL,
-            path,
+            wpath,
             IMAGE_ICON,
-            vec2_pos(size) ? size.x : 0,
-            vec2_pos(size) ? size.y : 0,
-            LR_LOADFROMFILE | (vec2_pos(size) ? 0 : LR_DEFAULTSIZE)
+            vec2_ge(size, 1) ? size.x : 0,
+            vec2_ge(size, 1) ? size.y : 0,
+            LR_LOADFROMFILE | (vec2_ge(size, 1) ? 0 : LR_DEFAULTSIZE)
         ),
-        .refc = 0
     };
+    free(wpath);
     return icon->hicon ? icon : (free(icon), NULL);
 }
 
-hny_cursor_t* hny_cursor_create(const wchar_t* path, hny_vec2_t size) {
+void hny_window_set_icon(hny_window_t* window, const hny_icon_t* icon, hny_icon_type_t type) {
+    if (window && window->hwnd)
+        SendMessageW(window->hwnd, WM_SETICON, type == HNY_ICON_SMALL ? ICON_SMALL : ICON_BIG, (LPARAM) (icon ? icon->hicon : NULL));
+}
+
+void hny_icon_free(hny_icon_t* icon) {
+    if (icon) DestroyIcon(icon->hicon), free(icon);
+}
+
+// === cursor
+hny_cursor_t* hny_cursor_create(const char* path, hny_vec2_t size) {
     hny_cursor_t* cursor = malloc(sizeof(*cursor));
     if (!cursor) return NULL;
+
+    wchar* wpath = char_to_wchar(path);
+    if (path && !wpath) return free(cursor), NULL;
+    if (!path) return *cursor = (hny_cursor_t) { .hcursor = NULL }, cursor;
+
     *cursor = (hny_cursor_t) {
         .hcursor = (HCURSOR) LoadImageW(
             NULL,
-            path,
+            wpath,
             IMAGE_CURSOR,
-            vec2_pos(size) ? size.x : 0,
-            vec2_pos(size) ? size.y : 0,
-            LR_LOADFROMFILE | (vec2_pos(size) ? 0 : LR_DEFAULTSIZE)
-        ),
-        .refc = 0
+            vec2_ge(size, 1) ? size.x : 0,
+            vec2_ge(size, 1) ? size.y : 0,
+            LR_LOADFROMFILE | (vec2_ge(size, 1) ? 0 : LR_DEFAULTSIZE)
+        )
     };
+    free(wpath);
     return cursor->hcursor ? cursor : (free(cursor), NULL);
 }
 
-hny_window_t* hny_window_create(const wchar_t* name, hny_icon_t* ico, hny_cursor_t* cur, hny_window_callback_fn_t callback,
-    hny_vec2_t off, hny_vec2_t size) {
+void hny_window_set_cursor(hny_window_t* window, hny_cursor_t* cur) {
+    if (!window && !window->hwnd) return;
+    
+    window->cur = cur;
+    POINT p; if (!GetCursorPos(&p) || WindowFromPoint(p) != window->hwnd) return;
+    SendMessageW(
+        window->hwnd,
+        WM_SETCURSOR,
+        (WPARAM) window->hwnd,
+        MAKELPARAM(SendMessageW(window->hwnd, WM_NCHITTEST, 0, MAKELPARAM(p.x, p.y)), WM_MOUSEMOVE)
+    );
+}
+
+void hny_cursor_free(hny_cursor_t* cur) {
+    if (cur) DestroyCursor(cur->hcursor), free(cur);
+}
+
+// === window
+hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
     static ATOM wcatom;
     if (!wcatom) {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
@@ -322,83 +367,95 @@ hny_window_t* hny_window_create(const wchar_t* name, hny_icon_t* ico, hny_cursor
             .cbSize         = sizeof wc
         };
         
-        wcatom = RegisterClassExW(&wc);  
+        wcatom = RegisterClassExW(&wc);
+        if (!wcatom) return NULL;
     }
-
-    if (!name) return NULL;
-    if (!vec2_pos(size)) return NULL;
-
-    hny_window_t* window = malloc(sizeof(*window));
-    if (!window) return NULL;
-    *window = (hny_window_t) {
-        .callback = callback,
-        .ico = ico,
-        .cur = cur,
-        .close = false
-    };
     
+    hny_window_t* window = calloc(1, sizeof(*window));
+    if (!window) return NULL;
+
     HWND hwnd = CreateWindowExW(
         0,
         MAKEINTATOM(wcatom),
-        name,
+        NULL,
         WS_OVERLAPPEDWINDOW,
-        vec2_pos(off) ? off.x : 0,
-        vec2_pos(off) ? off.y : 0,
+        vec2_ge(off, 0) ? off.x : CW_USEDEFAULT,
+        vec2_ge(off, 0) ? off.y : CW_USEDEFAULT,
         size.x,
         size.y,
         NULL,
         NULL,
         GetModuleHandleW(NULL),
-        window
+        NULL
     ); if (!hwnd) return free(window), NULL;
 
-    if (ico) ico->refc++;
-    if (cur) cur->refc++;
-
-    return window; 
+    return window->hwnd = hwnd, SetWindowLongPtrW(window->hwnd, GWLP_USERDATA, (LONG_PTR) window), window; 
 }
 
-void hny_window_destroy(hny_window_t* window) {
-    if (!window) return;
+void hny_window_set_title(hny_window_t* window, const char* name) {
+    if (!window || !window->hwnd) return;
 
-    if (window->ico && !--window->ico->refc) icon_destroy(window->ico);
-    if (window->cur && !--window->cur->refc) cursor_destroy(window->cur);
-    window->ico = NULL, window->cur = NULL;
+    wchar* wname = char_to_wchar(name);
+    if (name && !wname) return;
 
-    DestroyWindow(window->hwnd);
-    free(window);
+    SetWindowTextW(window->hwnd, wname);
+    free(wname);
 }
 
 void hny_window_hide(hny_window_t* window) {
-    if (window) ShowWindow(window->hwnd, SW_HIDE);
+    if (window && window->hwnd) ShowWindow(window->hwnd, SW_HIDE);
 }
 
 void hny_window_show(hny_window_t* window) {
-    if (window) ShowWindow(window->hwnd, SW_SHOW);
+    if (window && window->hwnd) ShowWindow(window->hwnd, SW_SHOW);
 }
 
 void hny_window_minimize(hny_window_t* window) {
-    if (window) ShowWindow(window->hwnd, SW_MINIMIZE);
+    if (window && window->hwnd) ShowWindow(window->hwnd, SW_MINIMIZE);
 }
 
 void hny_window_maximize(hny_window_t* window) {
-    if (window) ShowWindow(window->hwnd, SW_MAXIMIZE);
+    if (window && window->hwnd) ShowWindow(window->hwnd, SW_MAXIMIZE);
 }
 
 void hny_window_restore(hny_window_t* window) {
-    if (window) ShowWindow(window->hwnd, SW_RESTORE);
-}
-
-bool hny_window_should_close(const hny_window_t* window) {
-    return window ? window->close : false;
-}
-
-void hny_window_set_close(hny_window_t* window) {
-    if (window) window->close = true;
+    if (window && window->hwnd) ShowWindow(window->hwnd, SW_RESTORE);
 }
 
 float hny_window_dpi_scale(hny_window_t* window) {
     return window && window->hwnd ? dpi_to_scale(GetDpiForWindow(window->hwnd)) : 0.0f;
+}
+
+bool hny_window_rect(hny_window_t* window, hny_rect_t* out) {
+    if (!window || !window->hwnd || !out) return false;
+
+    RECT r;
+    if (!GetClientRect(window->hwnd, &r)) return false;
+    POINT tl = { .x = r.left,  .y = r.top };
+    POINT br = { .x = r.right, .y = r.bottom };
+    if (!ClientToScreen(window->hwnd, &tl) || !ClientToScreen(window->hwnd, &br)) return false;
+    
+    return *out = (hny_rect_t) {
+        .tl = { .x = tl.x, .y = tl.y },
+        .br = { .x = br.x, .y = br.y }
+    }, true;
+}
+
+void hny_window_free(hny_window_t* window) {
+    if (window && window->hwnd) DestroyWindow(window->hwnd); 
+}
+
+void hny_window_set_callback(hny_window_t* window, hny_window_callback_fn_t callback) {
+    if (window) window->callback = callback;
+}
+
+bool hny_cursor_pos(hny_vec2_t* out) {
+    POINT p;
+    if (!out || !GetCursorPos(&p)) return false;
+    return *out = (hny_vec2_t) {
+        .x = p.x,
+        .y = p.y
+    }, true;
 }
 
 void hny_dispatch_events(void) {

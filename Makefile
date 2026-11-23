@@ -1,34 +1,33 @@
-CC		= cc
-AR		= ar
-CFLAGS	= -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2
+CC		?= cc
+AR		?= ar
+CFLAGS	?= -std=c99 -Wall -Wextra -Wpedantic -Iinclude -O2
 
-SRC_DIR = src
-BLD_DIR = build
-DOC_DIR = docs
-OBJ_DIR	= $(BLD_DIR)/obj
-LIB_DIR = $(BLD_DIR)/lib
+NAME	:= honey
+SRC_DIR := src
+DOC_DIR := docs
+LIB_DIR := lib
+OBJ_DIR := $(LIB_DIR)/obj
 
-SRCS	= $(wildcard $(SRC_DIR)/*.c)
-OBJS	= $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
-TARGETS = $(patsubst $(SRC_DIR)/%.c,$(LIB_DIR)/lib%.a,$(SRCS))
+TARGET  := $(LIB_DIR)/lib$(NAME).a
+SRCS 	:= $(wildcard $(SRC_DIR)/*.c)
+OBJS 	:= $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)/%.o,$(SRCS))
 
-build: $(TARGETS)
+$(NAME) build all: $(TARGET)
 
 clean:
-	rm -rf $(BLD_DIR)
-	rm -rf $(DOC_DIR)
+	rm -rf $(LIB_DIR) $(DOC_DIR) $(OBJ_DIR)
 
 docs:
 	mkdir -p $(DOC_DIR)
 	doxygen Doxyfile
 
-$(LIB_DIR)/lib%.a: $(OBJ_DIR)/%.o
-	mkdir -p $(LIB_DIR)
+$(TARGET): $(OBJS)
 	$(AR) rcs $@ $^
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c
-	mkdir -p $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.c | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
-.PHONY: build clean docs
-.SECONDARY: $(OBJS)
+$(LIB_DIR) $(OBJ_DIR):
+	mkdir -p $@
+
+.PHONY: $(NAME) clean docs

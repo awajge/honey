@@ -2,7 +2,7 @@
 #define HONEY_ECS_H
 
 /**
- * @file honey.h
+ * @file honey_ecs.h
  * @author Akshat Wajge
  * @brief A simplistic approach to an ECS
  * @version 1.0

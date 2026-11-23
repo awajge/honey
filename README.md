@@ -1,3 +1,5 @@
+# Honey ECS
+
 a sparse/dense set ECS implementation built around the idea of making a simple, non-threatening ECS that 1. is simple to use 2.provides core ECS functionality and 3. accomodates all games types, AAA to pong.
 
 ## features
@@ -19,5 +21,6 @@ a sparse/dense set ECS implementation built around the idea of making a simple, 
  - 'make' or 'make build' for lib (libhoney.a) - use honey.h in include/
  - 'make docs' for documentation (open docs/index.html)
  - 'make clean' to clean up both
+ 
 ---
 shoutout [Flecs](https://github.com/sandermertens/flecs) & [EnTT](https://github.com/skypjack/entt) for a TON of inspiration behind many of the design choices :)

@@ -2,7 +2,6 @@
 #define HONEY_WIN32_H
 
 #include <stdbool.h>
-#include <stddef.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -12,9 +11,18 @@ typedef struct hny_vec2_t {
     int x, y;
 } hny_vec2_t;
 
+typedef struct hny_rect_t {
+    hny_vec2_t tl, br;
+} hny_rect_t;
+
+typedef enum hny_icon_type_t {
+    HNY_ICON_SMALL,
+    HNY_ICON_BIG
+} hny_icon_type_t;
+
 typedef enum hny_input_action_t {
-    HNY_INPUT_ACTION_RELEASE,
     HNY_INPUT_ACTION_PRESS,
+    HNY_INPUT_ACTION_RELEASE,
     HNY_INPUT_ACTION_REPEAT
 } hny_input_action_t;
 
@@ -69,11 +77,6 @@ typedef enum hny_key_t {
     HNY_KEY_KP_9 = 0x0049, HNY_KEY_KP_0 = 0x0052
 } hny_key_t;
 
-typedef struct hny_key_info_t {
-    hny_key_t key;
-    hny_input_action_t action;
-} hny_key_info_t;
-
 typedef enum hny_mouse_button_t {
     HNY_MOUSE_BUTTON_LEFT,
     HNY_MOUSE_BUTTON_RIGHT,
@@ -83,6 +86,7 @@ typedef enum hny_mouse_button_t {
 } hny_mouse_button_t;
 
 typedef enum hny_event_type_t {
+    HNY_EVENT_DESTROY,
     HNY_EVENT_CLOSE,
     HNY_EVENT_POSTRESIZE,   // vec2
     HNY_EVENT_FOCUS,
@@ -93,6 +97,7 @@ typedef enum hny_event_type_t {
     HNY_EVENT_MOUSE_BUTTON, // button_info
     HNY_EVENT_MOUSE_WHEEL,  // wheel_info
     HNY_EVENT_DPICHANGE,    // dpi_scale
+    HNY_EVENT_USERRESIZE    // rect
 } hny_event_type_t;
 
 typedef struct hny_event_t {
@@ -111,6 +116,7 @@ typedef struct hny_event_t {
             float x, y;
         } wheel_info;
         float dpi_scale;
+        hny_rect_t rect;
     } u;
 } hny_event_t;
 
@@ -118,24 +124,34 @@ typedef struct hny_icon_t hny_icon_t;
 typedef struct hny_cursor_t hny_cursor_t;
 typedef struct hny_window_t hny_window_t;
 
-typedef void (*hny_window_callback_fn_t)(hny_window_t*, const hny_event_t*);
+typedef void (*hny_window_callback_fn_t)(hny_window_t*, hny_event_t*);
 
-hny_icon_t* hny_icon_create(const wchar_t* path, hny_vec2_t size);
-hny_cursor_t* hny_cursor_create(const wchar_t* path, hny_vec2_t size);
-hny_window_t* hny_window_create(const wchar_t* name, hny_icon_t* ico, hny_cursor_t* cur, hny_window_callback_fn_t callback,
-    hny_vec2_t off, hny_vec2_t size);
-void hny_window_destroy(hny_window_t* window);
+hny_icon_t* hny_icon_create(const char* path, hny_vec2_t size);
+void hny_window_set_icon(hny_window_t* window, const hny_icon_t* icon, hny_icon_type_t icont);
+void hny_icon_free(hny_icon_t* icon);
+
+hny_cursor_t* hny_cursor_create(const char* path, hny_vec2_t size);
+void hny_window_set_cursor(hny_window_t* window, hny_cursor_t* cur);
+void hny_cursor_free(hny_cursor_t* cur);
+
+hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size);
+void hny_window_set_title(hny_window_t* window, const char* name);
 void hny_window_show(hny_window_t* window);
+void hny_window_free(hny_window_t* window);
 void hny_window_hide(hny_window_t* window);
 void hny_window_minimize(hny_window_t* window);
 void hny_window_maximize(hny_window_t* window);
 void hny_window_restore(hny_window_t* window);
-bool hny_window_should_close(const hny_window_t* window);
-void hny_window_set_close(hny_window_t* window);
 float hny_window_dpi_scale(hny_window_t* window);
-void hny_dispatch_events(void);
+bool hny_window_rect(hny_window_t* window, hny_rect_t* out);
+void hny_window_free(hny_window_t* window);
 
-void hny_window_destroy(hny_window_t* window);
+void hny_window_set_callback(hny_window_t* window, hny_window_callback_fn_t callback);
+
+
+bool hny_cursor_pos(hny_vec2_t* out);
+
+void hny_dispatch_events(void);
 
 #ifdef __cplusplus
 }
