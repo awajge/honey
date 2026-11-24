@@ -2,7 +2,7 @@
 #define UNICODE
 #endif
 
-#define _WIN32_WINNT 0x0A00 // target win10+ FUCK everything else
+#define _WIN32_WINNT 0x0A00
 
 #include "honey_win32.h"
 #include "internal.h"
@@ -53,8 +53,7 @@ static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         case WM_NCDESTROY: {
             window->hwnd = NULL;
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
-            free(window);
-            break;
+            return 0;
         }
 
         case WM_SETCURSOR: {
@@ -72,16 +71,6 @@ static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
 
         case WM_ERASEBKGND: {
             return 1;
-        }
-
-        case WM_SYSCOMMAND: { // check this out ==================
-            switch (wParam & 0xFFF0) {
-                case SC_SCREENSAVE:
-                case SC_MONITORPOWER:
-                case SC_KEYMENU:
-                    return 0;
-            }
-            break;
         }
     }
 
@@ -150,7 +139,7 @@ static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             return 0;
         }
 
-        case WM_MOUSEMOVE: {
+        case WM_MOUSEMOVE: { // cursor move, pixels
             POINTS p = MAKEPOINTS(lParam);
             window->callback(window, &(hny_event_t) {
                 .type = HNY_EVENT_MOUSE_MOVE,
@@ -162,7 +151,7 @@ static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
             return 0;
         }
 
-        case WM_INPUT: {
+        case WM_INPUT: { // mouse hardware move, not pixels
             RAWMOUSE m; RAWINPUT ri; UINT size = sizeof ri;
             if (GetRawInputData((HRAWINPUT) lParam, RID_INPUT, &ri, &size, sizeof(RAWINPUTHEADER)) == (UINT) -1) break;
             if (ri.header.dwType != RIM_TYPEMOUSE || (m = ri.data.mouse).usFlags & MOUSE_MOVE_ABSOLUTE) break;
@@ -174,7 +163,7 @@ static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
                     .y = m.lLastY
                 }
             });
-            break;
+            return 0;
         }
 
         case WM_LBUTTONDOWN:
@@ -266,7 +255,7 @@ static LRESULT CALLBACK winproc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         }
     }
 
-    return DefWindowProc(hwnd, msg, wParam, lParam);
+    return DefWindowProcW(hwnd, msg, wParam, lParam);
 }
 
 // ===== implementation
@@ -295,8 +284,11 @@ hny_icon_t* hny_icon_create(const char* path, hny_vec2_t size) {
 }
 
 void hny_window_set_icon(hny_window_t* window, const hny_icon_t* icon, hny_icon_type_t type) {
-    if (window && window->hwnd)
-        SendMessageW(window->hwnd, WM_SETICON, type == HNY_ICON_SMALL ? ICON_SMALL : ICON_BIG, (LPARAM) (icon ? icon->hicon : NULL));
+    if (!hny_window_valid(window)) return;
+    switch (type) {
+        case HNY_ICON_SMALL: SendMessageW(window->hwnd, WM_SETICON, ICON_SMALL, (LPARAM) (icon ? icon->hicon : NULL)); break;
+        case HNY_ICON_BIG:   SendMessageW(window->hwnd, WM_SETICON, ICON_BIG,   (LPARAM) (icon ? icon->hicon : NULL)); break;
+    }
 }
 
 void hny_icon_free(hny_icon_t* icon) {
@@ -327,11 +319,11 @@ hny_cursor_t* hny_cursor_create(const char* path, hny_vec2_t size) {
 }
 
 void hny_window_set_cursor(hny_window_t* window, hny_cursor_t* cur) {
-    if (!window && !window->hwnd) return;
+    if (!hny_window_valid(window)) return;
     
     window->cur = cur;
     POINT p; if (!GetCursorPos(&p) || WindowFromPoint(p) != window->hwnd) return;
-    SendMessageW(
+    SendMessageW( // send cursor event w/ hit test results
         window->hwnd,
         WM_SETCURSOR,
         (WPARAM) window->hwnd,
@@ -374,17 +366,22 @@ hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
     hny_window_t* window = calloc(1, sizeof(*window));
     if (!window) return NULL;
 
+    DWORD exstyle = 0, style = WS_OVERLAPPEDWINDOW;
+
+    RECT rect = {.left= 0, .top = 0, .right = size.x, .bottom = size.y};
+    UINT dpi = GetDpiForSystem();
+    AdjustWindowRectExForDpi(&rect, style, FALSE, exstyle, dpi);
+
     HWND hwnd = CreateWindowExW(
-        0,
+        exstyle,
         MAKEINTATOM(wcatom),
         NULL,
-        WS_OVERLAPPEDWINDOW,
-        vec2_ge(off, 0) ? off.x : CW_USEDEFAULT,
-        vec2_ge(off, 0) ? off.y : CW_USEDEFAULT,
-        size.x,
-        size.y,
-        NULL,
-        NULL,
+        style,
+        vec2_ge(off, 0) ? off.x + rect.left : CW_USEDEFAULT,
+        vec2_ge(off, 0) ? off.y + rect.top  : CW_USEDEFAULT,
+        rect.right - rect.left,
+        rect.bottom - rect.top,
+        NULL, NULL,
         GetModuleHandleW(NULL),
         NULL
     ); if (!hwnd) return free(window), NULL;
@@ -393,7 +390,7 @@ hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
 }
 
 void hny_window_set_title(hny_window_t* window, const char* name) {
-    if (!window || !window->hwnd) return;
+    if (!hny_window_valid(window)) return;
 
     wchar* wname = char_to_wchar(name);
     if (name && !wname) return;
@@ -403,34 +400,40 @@ void hny_window_set_title(hny_window_t* window, const char* name) {
 }
 
 void hny_window_hide(hny_window_t* window) {
-    if (window && window->hwnd) ShowWindow(window->hwnd, SW_HIDE);
+    if (hny_window_valid(window)) ShowWindow(window->hwnd, SW_HIDE);
 }
 
 void hny_window_show(hny_window_t* window) {
-    if (window && window->hwnd) ShowWindow(window->hwnd, SW_SHOW);
+    if (hny_window_valid(window)) ShowWindow(window->hwnd, SW_SHOW);
 }
 
-void hny_window_minimize(hny_window_t* window) {
-    if (window && window->hwnd) ShowWindow(window->hwnd, SW_MINIMIZE);
+void hny_window_set_visible(hny_window_t* window, bool vis) {
+    if (hny_window_valid(window)) ShowWindow(window->hwnd, vis ? SW_SHOW : SW_HIDE);
 }
 
-void hny_window_maximize(hny_window_t* window) {
-    if (window && window->hwnd) ShowWindow(window->hwnd, SW_MAXIMIZE);
+bool hny_window_visible(const hny_window_t* window) {
+    return hny_window_valid(window) && IsWindowVisible(window->hwnd);
 }
 
-void hny_window_restore(hny_window_t* window) {
-    if (window && window->hwnd) ShowWindow(window->hwnd, SW_RESTORE);
+void hny_window_set_state(hny_window_t* window, hny_window_state_t state) {
+    if (!hny_window_valid(window)) return;
+    switch (state) {
+        case HNY_WINDOW_STATE_MAXIMIZE: ShowWindow(window->hwnd, SW_MAXIMIZE); break;
+        case HNY_WINDOW_STATE_MINIMIZE: ShowWindow(window->hwnd, SW_MINIMIZE); break;
+        case HNY_WINDOW_STATE_RESTORE:  ShowWindow(window->hwnd, SW_RESTORE);  break;
+    }
 }
 
-float hny_window_dpi_scale(hny_window_t* window) {
-    return window && window->hwnd ? dpi_to_scale(GetDpiForWindow(window->hwnd)) : 0.0f;
+float hny_window_dpi_scale(const hny_window_t* window) {
+    return hny_window_valid(window) ? dpi_to_scale(GetDpiForWindow(window->hwnd)) : 0.0f;
 }
 
-bool hny_window_rect(hny_window_t* window, hny_rect_t* out) {
-    if (!window || !window->hwnd || !out) return false;
+bool hny_window_rect(const hny_window_t* window, hny_rect_t* out) {
+    if (!hny_window_valid(window) || !out) return false;
 
-    RECT r;
+    RECT r; 
     if (!GetClientRect(window->hwnd, &r)) return false;
+
     POINT tl = { .x = r.left,  .y = r.top };
     POINT br = { .x = r.right, .y = r.bottom };
     if (!ClientToScreen(window->hwnd, &tl) || !ClientToScreen(window->hwnd, &br)) return false;
@@ -441,12 +444,34 @@ bool hny_window_rect(hny_window_t* window, hny_rect_t* out) {
     }, true;
 }
 
-void hny_window_free(hny_window_t* window) {
-    if (window && window->hwnd) DestroyWindow(window->hwnd); 
+void hny_window_set_rect(hny_window_t* window, hny_rect_t rect) {
+    if (!hny_window_valid(window)) return;
+
+    RECT r = { .left = rect.tl.x, .top = rect.tl.y, .right = rect.br.x, .bottom = rect.br.y };
+    AdjustWindowRectExForDpi(
+        &r,
+        (DWORD) GetWindowLongPtrW(window->hwnd, GWL_STYLE), FALSE,
+        (DWORD) GetWindowLongPtrW(window->hwnd, GWL_EXSTYLE), GetDpiForWindow(window->hwnd)
+    );
+
+    SetWindowPos(window->hwnd, NULL, r.left, r.top, r.left - r.right, r.top - r.bottom, SWP_NOZORDER | SWP_NOACTIVATE);
+}
+
+bool hny_window_destroy(hny_window_t* window) {
+    if (hny_window_valid(window)) DestroyWindow(window->hwnd);
+    return !hny_window_valid(window);
+}
+
+bool hny_window_free(hny_window_t* window) {
+    return hny_window_destroy(window) ? free(window), true : false;
+}
+
+bool hny_window_valid(const hny_window_t* window) {
+    return window && window->hwnd;
 }
 
 void hny_window_set_callback(hny_window_t* window, hny_window_callback_fn_t callback) {
-    if (window) window->callback = callback;
+    if (hny_window_valid(window)) window->callback = callback;
 }
 
 bool hny_cursor_pos(hny_vec2_t* out) {

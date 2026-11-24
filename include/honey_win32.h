@@ -15,6 +15,12 @@ typedef struct hny_rect_t {
     hny_vec2_t tl, br;
 } hny_rect_t;
 
+typedef enum hny_window_state_t {
+    HNY_WINDOW_STATE_MAXIMIZE,
+    HNY_WINDOW_STATE_MINIMIZE,
+    HNY_WINDOW_STATE_RESTORE
+} hny_window_state_t;
+
 typedef enum hny_icon_type_t {
     HNY_ICON_SMALL,
     HNY_ICON_BIG
@@ -127,30 +133,31 @@ typedef struct hny_window_t hny_window_t;
 typedef void (*hny_window_callback_fn_t)(hny_window_t*, hny_event_t*);
 
 hny_icon_t* hny_icon_create(const char* path, hny_vec2_t size);
-void hny_window_set_icon(hny_window_t* window, const hny_icon_t* icon, hny_icon_type_t icont);
+hny_cursor_t* hny_cursor_create(const char* path, hny_vec2_t size);
+hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size);
+
+void hny_cursor_free(hny_cursor_t* cur);
 void hny_icon_free(hny_icon_t* icon);
 
-hny_cursor_t* hny_cursor_create(const char* path, hny_vec2_t size);
-void hny_window_set_cursor(hny_window_t* window, hny_cursor_t* cur);
-void hny_cursor_free(hny_cursor_t* cur);
-
 hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size);
-void hny_window_set_title(hny_window_t* window, const char* name);
-void hny_window_show(hny_window_t* window);
-void hny_window_free(hny_window_t* window);
-void hny_window_hide(hny_window_t* window);
-void hny_window_minimize(hny_window_t* window);
-void hny_window_maximize(hny_window_t* window);
-void hny_window_restore(hny_window_t* window);
-float hny_window_dpi_scale(hny_window_t* window);
-bool hny_window_rect(hny_window_t* window, hny_rect_t* out);
-void hny_window_free(hny_window_t* window);
 
+bool hny_window_destroy(hny_window_t* window);
+bool hny_window_free(hny_window_t* window);
+
+void hny_window_set_icon(hny_window_t* window, const hny_icon_t* icon, hny_icon_type_t icont);
+void hny_window_set_cursor(hny_window_t* window, hny_cursor_t* cur);
 void hny_window_set_callback(hny_window_t* window, hny_window_callback_fn_t callback);
+void hny_window_set_title(hny_window_t* window, const char* name);
+void hny_window_set_visible(hny_window_t* window, bool vis);
+void hny_window_set_state(hny_window_t* window, hny_window_state_t cmd);
+void hny_window_set_rect(hny_window_t* window, hny_rect_t rect);
 
-
+bool hny_window_visible(const hny_window_t* window);
+float hny_window_dpi_scale(const hny_window_t* window);
+bool hny_window_rect(const hny_window_t* window, hny_rect_t* out);
 bool hny_cursor_pos(hny_vec2_t* out);
 
+bool hny_window_valid(const hny_window_t* window);
 void hny_dispatch_events(void);
 
 #ifdef __cplusplus
