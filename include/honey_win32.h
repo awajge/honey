@@ -156,8 +156,8 @@ bool hny_window_visible(const hny_window_t* window);
 float hny_window_dpi_scale(const hny_window_t* window);
 bool hny_window_rect(const hny_window_t* window, hny_rect_t* out);
 bool hny_cursor_pos(hny_vec2_t* out);
-
 bool hny_window_valid(const hny_window_t* window);
+
 void hny_dispatch_events(void);
 
 #ifdef __cplusplus

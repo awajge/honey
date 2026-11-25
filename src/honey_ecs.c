@@ -7,8 +7,6 @@
 #include <stdarg.h>
 #include <limits.h>
 
-#define HNY_STATIC_ASSERT(name, expr) typedef char name[(expr) ? 1 : -1];
-
 /* =============== Entity ID =============== */
 typedef u32             hny_entity_id_t;
 
