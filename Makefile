@@ -1,6 +1,6 @@
 CC		?= cc
 AR		?= ar
-CFLAGS	?= -std=c99 -Wall -Wextra -Wpedantic -Iinclude -Iexternal -O2
+CFLAGS	?= -std=c99 -Wall -Wextra -Wpedantic -Wshadow -Wconversion -Iinclude -Iexternal -O2
 
 NAME	:= honey
 SRC_DIR := src

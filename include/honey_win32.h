@@ -139,6 +139,7 @@ hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size);
 void hny_cursor_free(hny_cursor_t* cur);
 void hny_icon_free(hny_icon_t* icon);
 
+void hny_win32_init(void);
 hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size);
 
 bool hny_window_destroy(hny_window_t* window);

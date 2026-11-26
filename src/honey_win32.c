@@ -10,6 +10,8 @@
 #include <stddef.h>
 #include <windows.h>
 
+#define HNY_WC_NAME  L"hny_window_class"
+
 struct hny_icon_t {
     HICON hicon;
 };
@@ -31,7 +33,7 @@ static inline wchar* char_to_wchar(const char* str) {
     int num = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, NULL, 0);
     if (!num) return NULL;
 
-    wchar* wstr = malloc(num * sizeof *wstr);
+    wchar* wstr = malloc((size_t) num * sizeof *wstr);
     if (!wstr) return NULL;
 
     return MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, str, -1, wstr, num) ? wstr : (free(wstr), NULL);
@@ -336,33 +338,27 @@ void hny_cursor_free(hny_cursor_t* cur) {
 }
 
 // === window
-hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
-    static ATOM wcatom;
-    if (!wcatom) {
-        SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+void hny_win32_init(void) {
+    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-        RAWINPUTDEVICE rid = {
-            .usUsagePage = 0x01,
-            .usUsage     = 0x02,
-            .dwFlags     = 0,
-            .hwndTarget  = NULL
-        };
-        RegisterRawInputDevices(&rid, 1, sizeof rid);
-    
-        WNDCLASSEXW wc = {
-            .lpszClassName  = L"hny_window_class",
-            .lpfnWndProc    = winproc,
-            .hInstance      = GetModuleHandleW(NULL),
-            .hCursor        = NULL,
-            .hIcon          = NULL,
-            .hbrBackground  = NULL,
-            .cbSize         = sizeof wc
-        };
-        
-        wcatom = RegisterClassExW(&wc);
-        if (!wcatom) return NULL;
-    }
-    
+    RAWINPUTDEVICE rid = {
+        .usUsagePage = 0x01,
+        .usUsage     = 0x02,
+        .dwFlags     = 0,
+    };
+    RegisterRawInputDevices(&rid, 1, sizeof rid);
+
+    WNDCLASSEXW wc = {
+        .lpszClassName  = HNY_WC_NAME,
+        .lpfnWndProc    = winproc,
+        .hInstance      = GetModuleHandleW(NULL),
+        .cbSize         = sizeof wc
+    };
+
+    RegisterClassExW(&wc);
+}
+
+hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
     hny_window_t* window = calloc(1, sizeof(*window));
     if (!window) return NULL;
 
@@ -374,7 +370,7 @@ hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
 
     HWND hwnd = CreateWindowExW(
         exstyle,
-        MAKEINTATOM(wcatom),
+        HNY_WC_NAME,
         NULL,
         style,
         vec2_ge(off, 0) ? off.x + rect.left : CW_USEDEFAULT,

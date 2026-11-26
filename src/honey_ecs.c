@@ -279,7 +279,7 @@ hny_entity_t* hny_components_get_entities(const hny_world_t* wrld, const hny_com
         for (size_t j = 0; j < ncmps; ++j)
             if (wrld->cdr[cmps[j]] != lec && !HNY_CSS(wrld->cdr[cmps[j]], lec->rds[i])) goto _;
         qcmps[(*rsize)++] = lec->rds[i];
-        _: continue;
+        _:;
     }
 
     return qcmps;
