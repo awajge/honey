@@ -34,5 +34,8 @@ a win32 windowing library with no dependencies that utilizes a simple callback t
  - 'make' or 'make build' for lib (libhoney.a) - use honey_ecs.h/honey_win32.h in include/
  - 'make docs' for documentation (open docs/index.html)
  - 'make clean' to clean up both
+
+## Honey VK
+wip...
  
 shoutout [Flecs](https://github.com/sandermertens/flecs), [EnTT](https://github.com/skypjack/entt), and [GLFW](https://github.com/glfw/glfw) for a TON of inspiration behind many of the design choices in Honey

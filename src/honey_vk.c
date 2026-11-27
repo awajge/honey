@@ -104,14 +104,14 @@ hny_instance_t* hny_instance_create(
     skip_extensions:;
     
     // ===== application info
-    // hardcoded: target vulkan 1.4, disregard application & engine version
+    // hardcoded: target vulkan 1.3, disregard application & engine version
     const VkApplicationInfo app_info = {
         .sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
         .pApplicationName = application_name,
         .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
         .pEngineName = engine_name,
         .engineVersion = VK_MAKE_VERSION(1, 0, 0),
-        .apiVersion = VK_API_VERSION_1_4
+        .apiVersion = VK_API_VERSION_1_3
     };
 
     // ===== instance create info
@@ -191,17 +191,18 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
     }
 
     if (vk_type & VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT)
-        type &= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_GENERAL;
+        type |= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_GENERAL;
     if (vk_type & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT)
-        type &= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_VALIDATION;
+        type |= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_VALIDATION;
     if (vk_type & VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT)
-        type &= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_PERFORMANCE;
+        type |= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_PERFORMANCE;
     if (vk_type & VK_DEBUG_UTILS_MESSAGE_TYPE_DEVICE_ADDRESS_BINDING_BIT_EXT)
-        type &= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_DEVICE_ADDRESS_BINDING;
+        type |= HNY_DEBUG_UTILS_MESSAGE_TYPE_FLAG_BIT_DEVICE_ADDRESS_BINDING;
 
     message = vk_pCallbackData->pMessage;
 
-    ((hny_debug_utils_messenger_callback_wrapper_t*) vk_pUserData)->debug_utils_messenger_callback(severity, type, message);
+    if (vk_pUserData)
+        ((hny_debug_utils_messenger_callback_wrapper_t*) vk_pUserData)->debug_utils_messenger_callback(severity, type, message);
     // don't abort the operation that triggered the callback
     return VK_FALSE;
 }
@@ -213,6 +214,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(VkDebugUtilsMessageSeverity
  */
 struct hny_debug_utils_messenger_t {
     hny_instance_t* instance;
+    hny_debug_utils_messenger_callback_wrapper_t debug_utils_messenger_callback_wrapper;
     VkDebugUtilsMessengerEXT vk_debug_utils_messenger;
 };
 
@@ -236,6 +238,8 @@ hny_debug_utils_messenger_t* hny_debug_utils_messenger_create(
     if (!debug_utils_messenger)
         return NULL;
 
+    debug_utils_messenger->debug_utils_messenger_callback_wrapper.debug_utils_messenger_callback = debug_utils_messenger_callback;
+
     // hardcoded
     VkDebugUtilsMessageSeverityFlagsEXT severity_flags = (
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
@@ -255,9 +259,7 @@ hny_debug_utils_messenger_t* hny_debug_utils_messenger_create(
         .messageSeverity = severity_flags,
         .messageType = message_type_flags,
         .pfnUserCallback = debug_callback,
-        .pUserData = &(hny_debug_utils_messenger_callback_wrapper_t) {
-            .debug_utils_messenger_callback = debug_utils_messenger_callback
-        }
+        .pUserData = &debug_utils_messenger->debug_utils_messenger_callback_wrapper
     };
     
     vk_result = instance->vk_instance_table.vkCreateDebugUtilsMessengerEXT(
@@ -309,7 +311,7 @@ hny_physical_device_t* hny_physical_device_create(hny_instance_t* instance) {
 
     hny_physical_device_t* physical_device = calloc(1, sizeof *physical_device);
     if (!physical_device)
-        return NULL;
+        goto cleanup;
 
     // ===== physical devices
     u32 vk_physical_device_count;
@@ -340,37 +342,13 @@ hny_physical_device_t* hny_physical_device_create(hny_instance_t* instance) {
     VkFlags required_queue_family_flags = (
         VK_QUEUE_GRAPHICS_BIT
     );
-
-    VkPhysicalDeviceVulkan11Features required_device_features_v11 = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
-        .pNext = NULL
-    };
-
-    VkPhysicalDeviceVulkan13Features required_device_features_v13 = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
-        .pNext = &required_device_features_v11
-    };
-
-    VkPhysicalDeviceExtendedDynamicStateFeaturesEXT required_device_features_eds = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
-        .pNext = &required_device_features_v13
-    };
-
-    VkPhysicalDeviceFeatures2 required_device_features_2 = {
-        .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
-        .pNext = &required_device_features_eds
-    };
     
     u32 best_physical_device_score = 0, best_physical_device_index = 0;
     for (u32 i = 0; i < vk_physical_device_count; ++i) {
         VkPhysicalDeviceProperties2 physical_device_properties = {
             .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2
         };
-        VkPhysicalDeviceFeatures2 physical_device_features = {
-            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2
-        };
         instance->vk_instance_table.vkGetPhysicalDeviceProperties2(vk_physical_devices[i], &physical_device_properties);
-        instance->vk_instance_table.vkGetPhysicalDeviceFeatures2(vk_physical_devices[i], &physical_device_features);
         
         // ===== filters
         VkExtensionProperties* vk_device_extension_properties = NULL;
@@ -403,7 +381,7 @@ hny_physical_device_t* hny_physical_device_create(hny_instance_t* instance) {
             goto skip_physical_device_scoring;
         
         for (u32 j = 0; j < required_device_extension_count; ++j) {
-            for (u32 k = 0; j < vk_device_extension_property_count; ++k) {
+            for (u32 k = 0; k < vk_device_extension_property_count; ++k) {
                 if (!strcmp(vk_device_extension_properties[k].extensionName, required_device_extensions[j]))
                     goto extension_found;
             }
@@ -433,7 +411,7 @@ hny_physical_device_t* hny_physical_device_create(hny_instance_t* instance) {
             vk_device_queue_family_properties
         );
         
-        for (u32 j = 0; i < vk_device_queue_family_property_count; ++j) {
+        for (u32 j = 0; j < vk_device_queue_family_property_count; ++j) {
             if (
                 (vk_device_queue_family_properties[j].queueFamilyProperties.queueFlags & required_queue_family_flags) ==
                 required_queue_family_flags
@@ -444,6 +422,26 @@ hny_physical_device_t* hny_physical_device_create(hny_instance_t* instance) {
         queue_flag_found:;
 
         // device features check
+        VkPhysicalDeviceVulkan11Features required_device_features_v11 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES,
+            .pNext = NULL
+        };
+
+        VkPhysicalDeviceVulkan13Features required_device_features_v13 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES,
+            .pNext = &required_device_features_v11
+        };
+
+        VkPhysicalDeviceExtendedDynamicStateFeaturesEXT required_device_features_eds = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_FEATURES_EXT,
+            .pNext = &required_device_features_v13
+        };
+
+        VkPhysicalDeviceFeatures2 required_device_features_2 = {
+            .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,
+            .pNext = &required_device_features_eds
+        };
+
         instance->vk_instance_table.vkGetPhysicalDeviceFeatures2(vk_physical_devices[i], &required_device_features_2);
         if (
             !required_device_features_v11.shaderDrawParameters ||
@@ -497,6 +495,7 @@ hny_physical_device_t* hny_physical_device_create(hny_instance_t* instance) {
     return (physical_device);
 
     cleanup:
+        free(physical_device);
         free(vk_physical_devices);
         return NULL;
 }
