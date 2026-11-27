@@ -27,6 +27,7 @@ a win32 windowing library with no dependencies that utilizes a simple callback t
  - simple main loop for MULTIPLE windows (hny_window_valid())
  - ISO c99, std libs + windows.h, no compiler builtins, simple c++ support
  - more coming soon as I work w/ vulkan
+ - **NOTE**: honey_win32 registers a process-wide raw input device unconditionally.
 
 ## build
  - install [Makefile](https://www.gnu.org/software/make/)

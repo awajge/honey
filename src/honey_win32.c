@@ -338,15 +338,15 @@ void hny_cursor_free(hny_cursor_t* cur) {
 }
 
 // === window
-void hny_win32_init(void) {
-    SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+bool hny_win32_init(void) {
+    if (!SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) return false;
 
     RAWINPUTDEVICE rid = {
         .usUsagePage = 0x01,
         .usUsage     = 0x02,
         .dwFlags     = 0,
     };
-    RegisterRawInputDevices(&rid, 1, sizeof rid);
+    if (!RegisterRawInputDevices(&rid, 1, sizeof rid)) return false;
 
     WNDCLASSEXW wc = {
         .lpszClassName  = HNY_WC_NAME,
@@ -355,7 +355,7 @@ void hny_win32_init(void) {
         .cbSize         = sizeof wc
     };
 
-    RegisterClassExW(&wc);
+    return RegisterClassExW(&wc);
 }
 
 hny_window_t* hny_window_create(hny_vec2_t off, hny_vec2_t size) {
